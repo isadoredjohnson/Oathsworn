@@ -1,0 +1,272 @@
+import React, { useState, useEffect } from 'react';
+import _ from 'lodash';
+
+const OathswornDiceCalculator = () => {
+  const [difficulty, setDifficulty] = useState(5);
+  const [rerollTokens, setRerollTokens] = useState(1);
+  const [results, setResults] = useState(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  // Dice face probabilities in Oathsworn
+  const BLANK = 0;
+  const ONE = 1;
+  const TWO = 2;
+  const CRIT = 3; // Special marker for critical 2
+
+  // Die face distribution
+  const dieFaces = [BLANK, BLANK, ONE, ONE, TWO, CRIT];
+
+  // Function to simulate rolling a single die, considering critical hits
+  const rollDie = () => {
+    let total = 0;
+    let face = dieFaces[Math.floor(Math.random() * dieFaces.length)];
+    
+    // If it's a critical, keep rolling and adding 2s
+    while (face === CRIT) {
+      total += 2;
+      face = dieFaces[Math.floor(Math.random() * dieFaces.length)];
+    }
+    
+    // Add the final non-critical value
+    if (face === ONE) total += 1;
+    if (face === TWO) total += 2;
+    
+    return { total, face };
+  };
+
+  // Function to simulate a full roll of n dice
+  const simulateRoll = (numDice, numRerollTokens = 0) => {
+    // Roll all dice
+    let rolls = _.times(numDice, rollDie);
+    
+    // Check for automatic failure (2+ blanks)
+    let blankCount = rolls.filter(r => r.face === BLANK).length;
+    if (blankCount >= 2) {
+      return { success: false, total: 0, autoFail: true };
+    }
+    
+    // Calculate total
+    let total = _.sumBy(rolls, 'total');
+    
+    // Apply rerolls if available and beneficial
+    let tokensRemaining = numRerollTokens;
+    
+    while (tokensRemaining > 0) {
+      // Find the lowest value die (prioritizing blanks)
+      const lowestRollIndex = _.findIndex(rolls, (roll, index) => {
+        return index === _.findIndex(rolls, r => {
+          if (r.face === BLANK) return -1; // Prioritize rerolling blanks
+          return r.total === _.minBy(rolls, 'total').total;
+        });
+      });
+      
+      const lowestRoll = rolls[lowestRollIndex];
+      
+      // Only reroll if it would be beneficial (blank or 1)
+      if (lowestRoll && (lowestRoll.face === BLANK || lowestRoll.total <= 1)) {
+        // Remove the lowest die value from total
+        total -= lowestRoll.total;
+        
+        // Roll a new die
+        const newRoll = rollDie();
+        
+        // Replace the old roll with the new one
+        rolls[lowestRollIndex] = newRoll;
+        
+        // Recalculate blank count
+        blankCount = rolls.filter(r => r.face === BLANK).length;
+        
+        // Check if the reroll created a second blank (auto fail)
+        if (blankCount >= 2) {
+          return { success: false, total: 0, autoFail: true };
+        }
+        
+        // Add the new roll to the total
+        total += newRoll.total;
+        
+        // Use up a token
+        tokensRemaining--;
+      } else {
+        // No beneficial rerolls left
+        break;
+      }
+    }
+    
+    return { success: total >= difficulty, total, autoFail: false };
+  };
+
+  // Monte Carlo simulation to estimate success probability
+  const calculateProbability = (numDice, numTrials = 100000) => {
+    let successes = 0;
+    let autoFails = 0;
+    let totalSum = 0;
+    
+    for (let i = 0; i < numTrials; i++) {
+      const result = simulateRoll(numDice, rerollTokens);
+      if (result.success) successes++;
+      if (result.autoFail) autoFails++;
+      totalSum += result.total;
+    }
+    
+    return {
+      numDice,
+      successRate: successes / numTrials,
+      autoFailRate: autoFails / numTrials,
+      averageTotal: totalSum / numTrials
+    };
+  };
+
+  const calculateOptimalDice = () => {
+    setIsCalculating(true);
+    
+    // We'll analyze from 1 to a reasonable upper limit
+    // The upper limit is adaptive based on the difficulty
+    const upperLimit = Math.max(15, Math.ceil(difficulty * 1.5));
+    
+    setTimeout(() => {
+      const allResults = [];
+      
+      for (let i = 1; i <= upperLimit; i++) {
+        const result = calculateProbability(i);
+        allResults.push(result);
+        
+        // Early stopping condition - when auto-fail rate gets too high
+        // and we're past the optimal point
+        if (i > 5 && 
+            result.autoFailRate > 0.4 && 
+            allResults[i-2].successRate > allResults[i-1].successRate) {
+          break;
+        }
+      }
+      
+      setResults(allResults);
+      setIsCalculating(false);
+    }, 0);
+  };
+
+  // Find the optimal number of dice
+  const getOptimalDice = () => {
+    if (!results) return null;
+    
+    // Sort by success rate, descending
+    const sorted = _.sortBy(results, r => -r.successRate);
+    return sorted[0];
+  };
+
+  useEffect(() => {
+    // Reset results when parameters change
+    setResults(null);
+  }, [difficulty, rerollTokens]);
+
+  const optimal = getOptimalDice();
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow">
+      <h1 className="text-2xl font-bold mb-6 text-gray-800">Oathsworn Optimal Dice Calculator</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="p-4 border rounded">
+          <label className="block mb-2 font-medium">
+            Difficulty (Target Sum)
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={difficulty}
+              onChange={e => setDifficulty(parseInt(e.target.value) || 1)}
+              className="mt-1 block w-full p-2 border rounded"
+            />
+          </label>
+        </div>
+        
+        <div className="p-4 border rounded">
+          <label className="block mb-2 font-medium">
+            Reroll Tokens Available
+            <input
+              type="number"
+              min="0"
+              max="5"
+              value={rerollTokens}
+              onChange={e => setRerollTokens(parseInt(e.target.value) || 0)}
+              className="mt-1 block w-full p-2 border rounded"
+            />
+          </label>
+        </div>
+      </div>
+      
+      <div className="mb-6">
+        <button
+          onClick={calculateOptimalDice}
+          disabled={isCalculating}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {isCalculating ? 'Calculating...' : 'Calculate Optimal Dice'}
+        </button>
+      </div>
+      
+      {isCalculating && (
+        <div className="text-center p-4">
+          <p>Running simulations... This may take a few seconds.</p>
+        </div>
+      )}
+      
+      {optimal && (
+        <div className="p-4 border rounded bg-green-50 mb-6">
+          <h2 className="text-xl font-bold mb-2">Optimal Strategy</h2>
+          <p className="text-lg mb-1">
+            <span className="font-medium">Best choice:</span> Roll <span className="font-bold text-green-700">{optimal.numDice} dice</span>
+          </p>
+          <p className="mb-1">
+            <span className="font-medium">Success rate:</span> {(optimal.successRate * 100).toFixed(2)}%
+          </p>
+          <p className="mb-1">
+            <span className="font-medium">Auto-fail rate:</span> {(optimal.autoFailRate * 100).toFixed(2)}%
+          </p>
+          <p>
+            <span className="font-medium">Average total:</span> {optimal.averageTotal.toFixed(2)}
+          </p>
+        </div>
+      )}
+      
+      {results && (
+        <div>
+          <h2 className="text-xl font-bold mb-4">Detailed Results</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 border">Dice</th>
+                  <th className="p-2 border">Success Rate</th>
+                  <th className="p-2 border">Auto-Fail Rate</th>
+                  <th className="p-2 border">Avg Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map(result => (
+                  <tr key={result.numDice} className={result.numDice === optimal.numDice ? 'bg-green-100' : ''}>
+                    <td className="p-2 border text-center">{result.numDice}</td>
+                    <td className="p-2 border text-center">{(result.successRate * 100).toFixed(2)}%</td>
+                    <td className="p-2 border text-center">{(result.autoFailRate * 100).toFixed(2)}%</td>
+                    <td className="p-2 border text-center">{result.averageTotal.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      
+      <div className="mt-6 p-4 border rounded bg-gray-50">
+        <h3 className="font-bold mb-2">Oathsworn Dice Mechanics</h3>
+        <ul className="list-disc pl-5">
+          <li>Each die has 6 faces: 2 Blanks, 2 ones, 1 regular two, and 1 critical two.</li>
+          <li>Critical twos trigger an additional roll of the same die, adding to your total.</li>
+          <li>Rolling two or more blanks results in an automatic failure.</li>
+          <li>With a reroll token, you can reroll one die after seeing your initial result.</li>
+        </ul>
+      </div>
+    </div>
+  );
+};
+
+export default OathswornDiceCalculator;
