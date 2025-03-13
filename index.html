@@ -48,6 +48,52 @@
       border-radius: 4px;
     }
     
+    .oathsworn-calculator .dice-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .oathsworn-calculator .dice-input {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .oathsworn-calculator .dice-input input {
+      width: 60px;
+      margin-left: 10px;
+    }
+    
+    .oathsworn-calculator .dice-icon {
+      display: inline-block;
+      width: 15px;
+      height: 15px;
+      border-radius: 3px;
+      margin-right: 5px;
+    }
+    
+    .white-dice {
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+    }
+    
+    .yellow-dice {
+      background-color: #f7dc6f;
+      border: 1px solid #d4b830;
+    }
+    
+    .red-dice {
+      background-color: #e74c3c;
+      border: 1px solid #b83227;
+    }
+    
+    .black-dice {
+      background-color: #333;
+      border: 1px solid #000;
+    }
+    
     .oathsworn-calculator label {
       display: block;
       margin-bottom: 8px;
@@ -136,6 +182,12 @@
       padding-left: 20px;
       margin-top: 10px;
     }
+    
+    .dice-type-info {
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed #ddd;
+    }
   </style>
 </head>
 <body>
@@ -158,6 +210,32 @@
       </div>
     </div>
     
+    <h2>Special Dice Available</h2>
+    <p><span class="dice-icon white-dice"></span> White dice are always available in unlimited quantity.</p>
+    <div class="dice-options">
+      <div class="input-container">
+        <div class="dice-input">
+          <span class="dice-icon yellow-dice"></span>
+          <label>Yellow Dice:</label>
+          <input type="number" id="yellow-dice-input" min="0" value="0" max="10">
+        </div>
+      </div>
+      <div class="input-container">
+        <div class="dice-input">
+          <span class="dice-icon red-dice"></span>
+          <label>Red Dice:</label>
+          <input type="number" id="red-dice-input" min="0" value="0" max="10">
+        </div>
+      </div>
+      <div class="input-container">
+        <div class="dice-input">
+          <span class="dice-icon black-dice"></span>
+          <label>Black Dice:</label>
+          <input type="number" id="black-dice-input" min="0" value="0" max="10">
+        </div>
+      </div>
+    </div>
+    
     <button id="calculate-button">Calculate Optimal Dice</button>
     
     <div id="calculating-message" class="results-container" style="display: none;">
@@ -167,7 +245,7 @@
     <div id="optimal-result" class="optimal-result" style="display: none;">
       <h2>Optimal Strategy</h2>
       <p>
-        <span>Best choice:</span> Roll <span id="optimal-dice" class="optimal-number"></span> dice
+        <span>Best choice:</span> Roll <span id="optimal-dice-counts"></span>
       </p>
       <p>
         <span>Success rate:</span> <strong id="optimal-success-rate"></strong>
@@ -185,7 +263,7 @@
       <table id="results-table">
         <thead>
           <tr>
-            <th>Dice</th>
+            <th>Dice Combination</th>
             <th>Success Rate</th>
             <th>Auto-Fail Rate</th>
             <th>Avg Total</th>
@@ -199,11 +277,44 @@
     
     <div class="info-box">
       <h3>Oathsworn Dice Mechanics</h3>
+      
+      <div class="dice-type-info">
+        <h4><span class="dice-icon white-dice"></span> White Dice</h4>
+        <ul>
+          <li>Face distribution: 2 Blanks, 2 Ones, 1 Two, 1 Critical Two</li>
+          <li>Critical dice explode (roll again and add the result)</li>
+        </ul>
+      </div>
+      
+      <div class="dice-type-info">
+        <h4><span class="dice-icon yellow-dice"></span> Yellow Dice</h4>
+        <ul>
+          <li>Face distribution: 2 Blanks, 1 One, 1 Two, 1 Three, 1 Critical Three</li>
+          <li>Critical dice explode (roll again and add the result)</li>
+        </ul>
+      </div>
+      
+      <div class="dice-type-info">
+        <h4><span class="dice-icon red-dice"></span> Red Dice</h4>
+        <ul>
+          <li>Face distribution: 2 Blanks, 1 Two, 1 Three, 1 Three, 1 Critical Four</li>
+          <li>Critical dice explode (roll again and add the result)</li>
+        </ul>
+      </div>
+      
+      <div class="dice-type-info">
+        <h4><span class="dice-icon black-dice"></span> Black Dice</h4>
+        <ul>
+          <li>Face distribution: 2 Blanks, 1 Three, 1 Three, 1 Four, 1 Critical Five</li>
+          <li>Critical dice explode (roll again and add the result)</li>
+        </ul>
+      </div>
+      
+      <h4>General Rules</h4>
       <ul>
-        <li>Each die has 6 faces: 2 Blanks, 2 ones, 1 regular two, and 1 critical two.</li>
-        <li>Critical twos trigger an additional roll of the same die, adding to your total.</li>
         <li>Rolling two or more blanks results in an automatic failure.</li>
         <li>With reroll tokens, you can reroll dice after seeing your initial result.</li>
+        <li>When using a reroll token, you typically want to reroll blanks or low value dice.</li>
       </ul>
     </div>
   </div>
@@ -213,99 +324,142 @@
       // Get DOM elements
       const difficultyInput = document.getElementById('difficulty-input');
       const rerollTokensInput = document.getElementById('reroll-tokens-input');
+      const yellowDiceInput = document.getElementById('yellow-dice-input');
+      const redDiceInput = document.getElementById('red-dice-input');
+      const blackDiceInput = document.getElementById('black-dice-input');
       const calculateButton = document.getElementById('calculate-button');
       const calculatingMessage = document.getElementById('calculating-message');
       const optimalResult = document.getElementById('optimal-result');
-      const optimalDice = document.getElementById('optimal-dice');
+      const optimalDiceCounts = document.getElementById('optimal-dice-counts');
       const optimalSuccessRate = document.getElementById('optimal-success-rate');
       const optimalFailRate = document.getElementById('optimal-fail-rate');
       const optimalAverage = document.getElementById('optimal-average');
       const resultsContainer = document.getElementById('results-container');
       const resultsBody = document.getElementById('results-body');
       
-      // Dice face constants
-      const BLANK = 0;
-      const ONE = 1;
-      const TWO = 2;
-      const CRIT = 3; // Special marker for critical 2
+      // Maximum white dice to consider
+      const MAX_WHITE_DICE = 10;
       
-      // Die face distribution
-      const dieFaces = [BLANK, BLANK, ONE, ONE, TWO, CRIT];
+      // Define all dice types
+      const DICE_TYPES = {
+        WHITE: {
+          name: 'White',
+          faces: [0, 0, 1, 1, 2, { value: 2, critical: true }]
+        },
+        YELLOW: {
+          name: 'Yellow',
+          faces: [0, 0, 1, 2, 3, { value: 3, critical: true }]
+        },
+        RED: {
+          name: 'Red',
+          faces: [0, 0, 2, 3, 3, { value: 4, critical: true }]
+        },
+        BLACK: {
+          name: 'Black',
+          faces: [0, 0, 3, 3, 4, { value: 5, critical: true }]
+        }
+      };
       
-      // Function to simulate rolling a single die, considering critical hits
-      function rollDie() {
+      // Function to simulate rolling a die of a specific type
+      function rollDie(dieType) {
+        const faces = DICE_TYPES[dieType].faces;
         let total = 0;
-        let face = dieFaces[Math.floor(Math.random() * dieFaces.length)];
+        let face = faces[Math.floor(Math.random() * faces.length)];
         
-        // If it's a critical, keep rolling and adding 2s
-        while (face === CRIT) {
-          total += 2;
-          face = dieFaces[Math.floor(Math.random() * dieFaces.length)];
+        // Handle critical hits (which have an object format)
+        while (typeof face === 'object' && face.critical) {
+          total += face.value;
+          // Roll again
+          face = faces[Math.floor(Math.random() * faces.length)];
         }
         
         // Add the final non-critical value
-        if (face === ONE) total += 1;
-        if (face === TWO) total += 2;
+        total += (typeof face === 'object') ? face.value : face;
         
-        return { total, face };
+        // Return the total and if it was a blank
+        return { 
+          total, 
+          isBlank: (typeof face !== 'object' && face === 0) || 
+                  (typeof face === 'object' && face.value === 0)
+        };
       }
       
-      // Function to simulate a full roll of n dice
-      function simulateRoll(numDice, difficulty, numRerollTokens = 0) {
-        // Roll all dice
-        let rolls = Array(numDice).fill().map(() => rollDie());
+      // Function to simulate a full roll with multiple dice types
+      function simulateRoll(diceConfig, difficulty, numRerollTokens = 0) {
+        // Roll all dice according to configuration
+        let rolls = [];
         
-        // Check for automatic failure (2+ blanks)
-        let blankCount = rolls.filter(r => r.face === BLANK).length;
-        if (blankCount >= 2) {
-          return { success: false, total: 0, autoFail: true };
+        // Add white dice
+        for (let i = 0; i < diceConfig.white; i++) {
+          rolls.push({ 
+            ...rollDie('WHITE'), 
+            type: 'WHITE'
+          });
         }
         
-        // Calculate total
+        // Add yellow dice
+        for (let i = 0; i < diceConfig.yellow; i++) {
+          rolls.push({ 
+            ...rollDie('YELLOW'), 
+            type: 'YELLOW'
+          });
+        }
+        
+        // Add red dice
+        for (let i = 0; i < diceConfig.red; i++) {
+          rolls.push({ 
+            ...rollDie('RED'), 
+            type: 'RED'
+          });
+        }
+        
+        // Add black dice
+        for (let i = 0; i < diceConfig.black; i++) {
+          rolls.push({ 
+            ...rollDie('BLACK'), 
+            type: 'BLACK'
+          });
+        }
+        
+        // Check for automatic failure (2+ blanks)
+        let blankCount = rolls.filter(r => r.isBlank).length;
+        let autoFail = blankCount >= 2;
+        
+        // Calculate total (regardless of auto-fail)
         let total = rolls.reduce((sum, roll) => sum + roll.total, 0);
         
         // Apply rerolls if available and beneficial
         let tokensRemaining = numRerollTokens;
         
-        while (tokensRemaining > 0) {
-          // Find the lowest value die (prioritizing blanks)
-          let lowestRollIndex = -1;
-          let lowestValue = Infinity;
+        while (tokensRemaining > 0 && rolls.length > 0) {
+          // Sort dice by value (prioritizing blanks, then lowest value)
+          rolls.sort((a, b) => {
+            if (a.isBlank && !b.isBlank) return -1;
+            if (!a.isBlank && b.isBlank) return 1;
+            return a.total - b.total;
+          });
           
-          for (let i = 0; i < rolls.length; i++) {
-            const roll = rolls[i];
-            if (roll.face === BLANK) {
-              lowestRollIndex = i;
-              break;
-            } else if (roll.total < lowestValue) {
-              lowestValue = roll.total;
-              lowestRollIndex = i;
-            }
-          }
+          // Get the worst die (first in the sorted array)
+          const worstDie = rolls[0];
           
-          if (lowestRollIndex === -1) break;
-          
-          const lowestRoll = rolls[lowestRollIndex];
-          
-          // Only reroll if it would be beneficial (blank or 1)
-          if (lowestRoll && (lowestRoll.face === BLANK || lowestRoll.total <= 1)) {
-            // Remove the die from our collection
-            rolls.splice(lowestRollIndex, 1);
+          // Only reroll if it would be beneficial (blank or low value)
+          if (worstDie.isBlank || worstDie.total <= 1) {
+            // Remove the die
+            rolls.shift();
             
-            // Reroll the die
-            const newRoll = rollDie();
+            // Reroll the die of the same type
+            const newRoll = { 
+              ...rollDie(worstDie.type), 
+              type: worstDie.type 
+            };
             rolls.push(newRoll);
             
             // Recalculate the total
             total = rolls.reduce((sum, roll) => sum + roll.total, 0);
             
-            // Recalculate blank count
-            blankCount = rolls.filter(r => r.face === BLANK).length;
-            
-            // Check if the reroll created a second blank (auto fail)
-            if (blankCount >= 2) {
-              return { success: false, total: 0, autoFail: true };
-            }
+            // Recalculate blank count and auto-fail
+            blankCount = rolls.filter(r => r.isBlank).length;
+            autoFail = blankCount >= 2;
             
             // Use up a token
             tokensRemaining--;
@@ -315,31 +469,38 @@
           }
         }
         
-        return { success: total >= difficulty, total, autoFail: false };
+        // Check success based on difficulty and any auto-fail condition
+        const success = !autoFail && total >= difficulty;
+        
+        return { 
+          success, 
+          total, 
+          autoFail 
+        };
       }
       
       // Monte Carlo simulation to estimate success probability
-      function calculateProbability(numDice, difficulty, rerollTokens, numTrials = 5000) {
+      function calculateProbability(diceConfig, difficulty, rerollTokens, numTrials = 5000) {
         let successes = 0;
         let autoFails = 0;
         let totalSum = 0;
         
         for (let i = 0; i < numTrials; i++) {
-          const result = simulateRoll(numDice, difficulty, rerollTokens);
+          const result = simulateRoll(diceConfig, difficulty, rerollTokens);
           if (result.success) successes++;
           if (result.autoFail) autoFails++;
-          totalSum += result.total;
+          totalSum += result.total; // Always add the total, even for auto-fails
         }
         
         return {
-          numDice,
+          diceConfig,
           successRate: successes / numTrials,
           autoFailRate: autoFails / numTrials,
           averageTotal: totalSum / numTrials
         };
       }
       
-      // Find the optimal number of dice
+      // Find the optimal dice configuration
       function getOptimalDice(results) {
         if (!results || !results.length) return null;
         
@@ -347,10 +508,23 @@
         return results.sort((a, b) => b.successRate - a.successRate)[0];
       }
       
+      // Function to format dice configuration as text
+      function formatDiceConfig(config) {
+        let parts = [];
+        if (config.white > 0) parts.push(`${config.white} White`);
+        if (config.yellow > 0) parts.push(`${config.yellow} Yellow`);
+        if (config.red > 0) parts.push(`${config.red} Red`);
+        if (config.black > 0) parts.push(`${config.black} Black`);
+        return parts.join(' + ');
+      }
+      
       // Handle calculation button click
       calculateButton.addEventListener('click', function() {
         const difficulty = parseInt(difficultyInput.value) || 5;
         const rerollTokens = parseInt(rerollTokensInput.value) || 0;
+        const maxYellowDice = parseInt(yellowDiceInput.value) || 0;
+        const maxRedDice = parseInt(redDiceInput.value) || 0;
+        const maxBlackDice = parseInt(blackDiceInput.value) || 0;
         
         // Show calculating message
         calculateButton.disabled = true;
@@ -359,31 +533,41 @@
         optimalResult.style.display = 'none';
         resultsContainer.style.display = 'none';
         
-        // We'll analyze from 1 to a reasonable upper limit
-        // The upper limit is adaptive based on the difficulty
-        const upperLimit = Math.max(10, Math.ceil(difficulty * 1.2));
-        
         // Use setTimeout to avoid freezing the UI
         setTimeout(function() {
           const allResults = [];
           
-          for (let i = 1; i <= upperLimit; i++) {
-            const result = calculateProbability(i, difficulty, rerollTokens);
-            allResults.push(result);
-            
-            // Early stopping conditions:
-            // 1. If we've seen 3 consecutive decreases in success rate
-            // 2. If we're past 5 dice and auto-fail rate is high
-            if (i > 3 && 
-                allResults[i-3].successRate > allResults[i-2].successRate && 
-                allResults[i-2].successRate > allResults[i-1].successRate) {
-              break;
-            }
-            
-            if (i > 5 && 
-                result.autoFailRate > 0.4 && 
-                allResults[i-2].successRate > allResults[i-1].successRate) {
-              break;
+          // For each combination of special dice
+          for (let yellow = 0; yellow <= maxYellowDice; yellow++) {
+            for (let red = 0; red <= maxRedDice; red++) {
+              for (let black = 0; black <= maxBlackDice; black++) {
+                // For each special dice combination, try different numbers of white dice
+                // Start with at least one die (special or white)
+                const needWhite = (yellow + red + black === 0);
+                const startWhite = needWhite ? 1 : 0;
+                
+                for (let white = startWhite; white <= MAX_WHITE_DICE; white++) {
+                  // Skip if no dice are selected
+                  if (white + yellow + red + black === 0) continue;
+                  
+                  const diceConfig = { white, yellow, red, black };
+                  const result = calculateProbability(diceConfig, difficulty, rerollTokens);
+                  allResults.push(result);
+                  
+                  // Optimization: if we have enough white dice and success rate is decreasing, stop adding more white dice
+                  if (white > 2 && allResults.length >= 2) {
+                    const prevIndex = allResults.length - 2;
+                    const currIndex = allResults.length - 1;
+                    if (allResults[prevIndex].diceConfig.white === white - 1 &&
+                        allResults[prevIndex].diceConfig.yellow === yellow &&
+                        allResults[prevIndex].diceConfig.red === red &&
+                        allResults[prevIndex].diceConfig.black === black &&
+                        allResults[prevIndex].successRate >= allResults[currIndex].successRate) {
+                      break; // Stop adding more white dice for this configuration
+                    }
+                  }
+                }
+              }
             }
           }
           
@@ -399,13 +583,13 @@
       
       // Function to display results
       function displayResults(results) {
-        // Find optimal dice count
+        // Find optimal dice configuration
         const optimal = getOptimalDice(results);
         
         if (!optimal) return;
         
         // Display optimal result
-        optimalDice.textContent = optimal.numDice;
+        optimalDiceCounts.textContent = formatDiceConfig(optimal.diceConfig);
         optimalSuccessRate.textContent = (optimal.successRate * 100).toFixed(2) + '%';
         optimalFailRate.textContent = (optimal.autoFailRate * 100).toFixed(2) + '%';
         optimalAverage.textContent = optimal.averageTotal.toFixed(2);
@@ -414,14 +598,23 @@
         // Clear and populate results table
         resultsBody.innerHTML = '';
         
-        results.forEach(function(result) {
+        // Sort results by success rate (descending)
+        results.sort((a, b) => b.successRate - a.successRate);
+        
+        // Take top 10 for readability
+        const topResults = results.slice(0, 10);
+        
+        topResults.forEach(function(result) {
           const row = document.createElement('tr');
-          if (result.numDice === optimal.numDice) {
+          if (result.diceConfig.white === optimal.diceConfig.white &&
+              result.diceConfig.yellow === optimal.diceConfig.yellow &&
+              result.diceConfig.red === optimal.diceConfig.red &&
+              result.diceConfig.black === optimal.diceConfig.black) {
             row.className = 'optimal-row';
           }
           
           row.innerHTML = `
-            <td>${result.numDice}</td>
+            <td>${formatDiceConfig(result.diceConfig)}</td>
             <td>${(result.successRate * 100).toFixed(2)}%</td>
             <td>${(result.autoFailRate * 100).toFixed(2)}%</td>
             <td>${result.averageTotal.toFixed(2)}</td>
